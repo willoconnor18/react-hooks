@@ -2,11 +2,59 @@
 // http://localhost:3000/isolated/exercise/04.js
 
 import * as React from 'react'
+import {useLocalStorageState} from '../utils'
+
+function useGameHistory() {
+  console.log('use game history')
+  const [gameStates, setGameStates] = useLocalStorageState('game-states', [
+    Array(9).fill(null),
+  ])
+  const [currentPositionIndex, setCurrentPositionIndex] = React.useState(0)
+
+  const addToHistory = nextState => {
+    if (currentPositionIndex === gameStates.length - 1) {
+      setGameStates([...gameStates, nextState])
+    } else {
+      setGameStates([
+        ...gameStates.slice(0, currentPositionIndex + 1),
+        nextState,
+      ])
+    }
+    setCurrentPositionIndex(currentPositionIndex + 1)
+  }
+
+  const backward = () => {
+    setCurrentPositionIndex(Math.max(0, currentPositionIndex - 1))
+  }
+
+  const forward = () => {
+    setCurrentPositionIndex(
+      Math.min(currentPositionIndex + 1, gameStates.length - 1),
+    )
+  }
+
+  const clearHistory = () => {
+    setGameStates([Array(9).fill(null)])
+    setCurrentPositionIndex(0)
+  }
+
+  console.log(gameStates)
+
+  return [
+    gameStates[currentPositionIndex],
+    addToHistory,
+    backward,
+    forward,
+    clearHistory,
+  ]
+}
 
 function Board() {
-  // 🐨 squares is the state for this component. Add useState for squares
-  const squares = Array(9).fill(null)
+  const [currentState, addToHistory, backward, forward, clearHistory] =
+    useGameHistory()
 
+  const nextValue = calculateNextValue(currentState)
+  const winner = calculateWinner(currentState)
   // 🐨 We'll need the following bits of derived state:
   // - nextValue ('X' or 'O')
   // - winner ('X', 'O', or null)
@@ -17,6 +65,7 @@ function Board() {
   // This is the function your square click handler will call. `square` should
   // be an index. So if they click the center square, this will be `4`.
   function selectSquare(square) {
+    if (isGameOver(currentState) || currentState[square]) return
     // 🐨 first, if there's already winner or there's already a value at the
     // given square index (like someone clicked a square that's already been
     // clicked), then return early so we don't make any state changes
@@ -26,22 +75,26 @@ function Board() {
     //
     // 🐨 make a copy of the squares array
     // 💰 `[...squares]` will do it!)
+    const squaresCopy = [...currentState]
     //
     // 🐨 set the value of the square that was selected
     // 💰 `squaresCopy[square] = nextValue`
+    squaresCopy[square] = nextValue
     //
     // 🐨 set the squares to your copy
+    addToHistory(squaresCopy)
   }
 
   function restart() {
     // 🐨 reset the squares
     // 💰 `Array(9).fill(null)` will do it!
+    clearHistory()
   }
 
   function renderSquare(i) {
     return (
       <button className="square" onClick={() => selectSquare(i)}>
-        {squares[i]}
+        {currentState[i]}
       </button>
     )
   }
@@ -49,7 +102,9 @@ function Board() {
   return (
     <div>
       {/* 🐨 put the status in the div below */}
-      <div className="status">STATUS</div>
+      <div className="status">
+        STATUS: {calculateStatus(winner, currentState, nextValue)}
+      </div>
       <div className="board-row">
         {renderSquare(0)}
         {renderSquare(1)}
@@ -67,6 +122,12 @@ function Board() {
       </div>
       <button className="restart" onClick={restart}>
         restart
+      </button>
+      <button className="undo" onClick={backward}>
+        undo
+      </button>
+      <button className="redo" onClick={forward}>
+        redo
       </button>
     </div>
   )
@@ -89,6 +150,10 @@ function calculateStatus(winner, squares, nextValue) {
     : squares.every(Boolean)
     ? `Scratch: Cat's game`
     : `Next player: ${nextValue}`
+}
+
+function isGameOver(squares) {
+  return calculateWinner(squares) || squares.every(Boolean)
 }
 
 // eslint-disable-next-line no-unused-vars
